@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.rw</groupId>
+	<artifactId>finance</artifactId>
+	<version>1.0</version>
+	<packaging>pom</packaging>
+	<name>finance</name>
+	<url>http://maven.apache.org</url>
+
+	<modules>
+		<module>finance-admin</module>
+		<module>finance-client</module>
+		<module>finance-server</module>
+		<module>finance-task</module>
+		<module>finance-common</module>
+	</modules>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<!--jar version -->
+		<com.alibaba.dubbo.version>2.5.7</com.alibaba.dubbo.version>
+		<org.apache.zookeeper.version>3.4.10</org.apache.zookeeper.version>
+		<com.github.sgroschupf.zkclient.version>0.1</com.github.sgroschupf.zkclient.version>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>maven-ali</id>
+			<url>http://maven.aliyun.com/nexus/content/groups/public//</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+				<updatePolicy>always</updatePolicy>
+				<checksumPolicy>fail</checksumPolicy>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+					<encoding>UTF-8</encoding>
+				</configuration>
+				<version>3.5</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<skipTests>true</skipTests>
+				</configuration>
+				<version>2.20</version>
+			</plugin>
+		</plugins>
+	</build>
+</project>

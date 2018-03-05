@@ -1,0 +1,123 @@
+package com.rw.finance.admin.service.impl;
+
+import com.google.gson.Gson;
+import com.rw.finance.admin.dao.*;
+import com.rw.finance.admin.service.AgentAccountService;
+import com.rw.finance.common.constants.OrderInfoConstants;
+import com.rw.finance.common.entity.*;
+import com.rw.finance.common.entity.order.AgentCashOrder;
+import com.rw.finance.common.pay.PayResult;
+import com.rw.finance.common.pay.PayerBo;
+import com.rw.finance.common.pay.PayerFactory;
+import com.rw.finance.common.utils.MathUtils;
+import com.rw.finance.common.utils.Result;
+import com.rw.finance.common.utils.UuidUtil;
+import org.apache.tools.ant.util.DateUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
+
+/**
+ * @author huanghongfei
+ * @file AgentAccountServiceImpl.java
+ * @date 2017年12月25日 上午10:05:16
+ * @declaration
+ */
+@Service
+public class AgentAccountServiceImpl implements AgentAccountService {
+    @Autowired
+    private BankInfoDao bankInfoDao;
+
+    @Autowired
+    private OrderInfoDao orderInfoDao;
+
+    @Autowired
+    private AgentCardDao agentCardDao;
+
+    @Autowired
+    private AgentInfoDao agentInfoDao;
+
+    @Autowired
+    private AgentAccountDao agentAccountDao;
+
+    @Autowired
+    private PayChannelDao payChannelDao;
+
+    @Transactional
+    @Override
+    public Result applyCash(Long agentid, Double amount, Long cardid) {
+        // 代理信息
+        AgentInfo info = agentInfoDao.findOne(agentid);
+        if (info == null) {
+            return new Result(202, "代理信息为空", null);
+        }
+
+        // 账户信息
+        AgentAccount account = agentAccountDao.findByAgentid(agentid);
+        if (account == null) {
+            return new Result(202, "代理账户为空", null);
+        }
+
+        if (account.getUsablebalance() <= 0 || amount > account.getUsablebalance()) {
+            return new Result(202, "账户余额不足", null);
+        }
+
+        // 卡片信息
+        AgentCard card = agentCardDao.findOne(cardid);
+        if (card == null) {
+            return new Result(202, "卡片信息为空", null);
+        }
+
+        BankInfo bankInfo = bankInfoDao.findOne(card.getBankid());
+        if (bankInfo == null || bankInfo.getBankcode() == null || bankInfo.getBankcode().isEmpty()) {
+            return new Result(202, "暂不支持提现", null);
+        }
+
+        // 订单明细
+        OrderInfo orderInfo = new OrderInfo();
+        orderInfo.setUserid(agentid);
+        orderInfo.setUsername(info.getAgentname());
+        orderInfo.setTradeno(UuidUtil.tradeNoBuilder(OrderInfoConstants.Prefix.AgentCashOrder.getPrefix()));
+        orderInfo.setOrderamount(amount);
+        orderInfo.setRealamount(amount);
+        orderInfo.setChannelid(payChannelDao.findByIsdef(1).getChannelid());
+        orderInfo.setType(OrderInfoConstants.Type.AgentCashOrder.getType());
+        orderInfo.setStatus(OrderInfoConstants.Status.STATUS0.getStatus());
+
+        // 通道参数
+        PayerBo.UserInfo puserInfo = new PayerBo().new UserInfo("", card.getCardholder());
+        PayerBo.CardInfo pcardInfo = new PayerBo().new CardInfo(card.getBankname(), card.getProvince(), card.getCity(),
+                card.getAbbreviation(), card.getCardno(), card.getMobile(), "", "");
+        PayerBo.OrderInfo porderInfo = new PayerBo().new OrderInfo(orderInfo.getTradeno(), "", amount, new
+                PayerFactory().DefaultPayer().getBackUrl(), "");
+
+        // 支付结果
+        PayResult payResult = new PayerFactory().DefaultPayer().agentPay(puserInfo, pcardInfo, porderInfo);
+        if (payResult.getSuccess()) {
+            // 提现明细
+            AgentCashOrder cashOrder = new AgentCashOrder();
+            cashOrder.setCardid(cardid);
+            cashOrder.setBankname(card.getBankname());
+            cashOrder.setCardno(card.getCardno());
+            cashOrder.setName(card.getCardholder());
+            cashOrder.setMobile(card.getMobile());
+
+            // 通道流水号
+            orderInfo.setOuttradeno(payResult.getPayTradeNo());
+            orderInfo.setDetails(new Gson().toJson(cashOrder));
+            orderInfo.setUpdatetime(DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+            orderInfo.setCreatetime(DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+            orderInfoDao.save(orderInfo);
+
+            // 更新账户
+            account.setUsablebalance(MathUtils.subtract(account.getUsablebalance(), amount));
+            account.setLockbalance(MathUtils.add(account.getLockbalance(), amount));
+            agentAccountDao.save(account);
+            return new Result(200, "申请提交成功", null);
+        } else {
+            return new Result(202, "申请提交失败", null);
+        }
+    }
+}

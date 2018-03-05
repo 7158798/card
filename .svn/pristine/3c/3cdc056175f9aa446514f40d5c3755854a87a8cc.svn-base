@@ -1,0 +1,122 @@
+package com.rw.finance.admin.service.impl;
+
+import com.rw.finance.admin.dao.MemberInfoDao;
+import com.rw.finance.admin.dao.RepayPlanDao;
+import com.rw.finance.admin.model.RepayPlanQueryModel;
+import com.rw.finance.admin.service.RepayPlanService;
+import com.rw.finance.common.entity.MemberInfo;
+import com.rw.finance.common.entity.RepayPlan;
+import com.rw.finance.common.utils.SortUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class RepayPlanServiceImpl implements RepayPlanService {
+    @Autowired
+    private RepayPlanDao repayPlanDao;
+
+    @Autowired
+    private MemberInfoDao memberInfoDao;
+
+    @Override
+    public Page<RepayPlan> getRepayPlans(RepayPlanQueryModel model) {
+        // 处理排序
+        List<Sort.Order> listOrder = SortUtils.toSortOrder(model.getOrderby());
+        if (model.getPage() > 0) {
+            model.setPage(model.getPage() - 1);
+        }
+
+        // 处理条件
+        Page<RepayPlan> info = repayPlanDao.findAll(new Specification<RepayPlan>() {
+            @Override
+            public Predicate toPredicate(Root<RepayPlan> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder
+                    criteriaBuilder) {
+
+                // 条件集合
+                List<Predicate> predicates = new ArrayList();
+
+                // 会员编号
+                if (model.getMemberid() != null && model.getMemberid() > 0) {
+                    predicates.add(criteriaBuilder.equal(root.get("memberid"), model.getMemberid()));
+                }
+
+                // 代理编号
+                if (model.getAgentid() != null && model.getAgentid() > 0) {
+                    List<Long> longs = null;
+                    List<MemberInfo> list = memberInfoDao.findByAgentid(model.getAgentid());
+                    if (list != null && list.size() > 0) {
+                        longs = list.stream().filter(s -> s.getMemberid() != null).map(s -> s.getMemberid())
+                                .collect(Collectors.toList());
+
+                        // 组装IN
+                        CriteriaBuilder.In<Object> in = criteriaBuilder.in(root.get("memberid"));
+                        for (Long id : longs) {
+                            in.value(id);
+                        }
+
+                        predicates.add(in);
+                    } else {
+                        predicates.add(criteriaBuilder.equal(root.get("memberid"), -1));
+                    }
+                }
+
+                // 计划类型
+                if (model.getPlantype() != null && model.getPlantype() != 99) {
+                    predicates.add(criteriaBuilder.equal(root.get("plantype"), model.getPlantype()));
+                }
+
+                // 状态
+                if (model.getStatus() != null && model.getStatus() != 99) {
+                    predicates.add(criteriaBuilder.equal(root.get("status"), model.getStatus()));
+                }
+
+                // 判断条件
+                if (predicates.size() > 0) {
+                    return criteriaQuery.where(predicates.toArray(new Predicate[predicates.size()]))
+                            .getRestriction();
+                }
+
+                return null;
+            }
+        }, new PageRequest(model.getPage(), model.getSize(), new Sort(listOrder)));
+
+        // 特殊处理
+        if (info.getContent() != null && info.getContent().size() > 0) {
+            // 编号集合
+            List<Long> longs = info.getContent().stream().map(s -> s.getMemberid()).collect(Collectors.toList());
+
+            // 会员集合
+            Iterable<MemberInfo> listMember = memberInfoDao.findAll(longs);
+            for (RepayPlan plan : info.getContent()) {
+                if (listMember != null) {
+                    listMember.forEach((s) -> {
+                        if (s.getMemberid().longValue() == plan.getMemberid().longValue()) {
+                            if (s.getNickname() == null || s.getNickname().isEmpty()) {
+                                plan.membername = s.getTelephone().substring(0, 3) + "****" + s.getTelephone().substring
+                                        (s.getTelephone().length() - 4);
+                            } else {
+                                plan.membername = s.getNickname();
+                            }
+
+                            return;
+                        }
+                    });
+                }
+            }
+        }
+
+        return info;
+    }
+}

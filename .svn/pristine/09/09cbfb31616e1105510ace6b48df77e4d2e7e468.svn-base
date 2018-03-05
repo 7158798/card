@@ -1,0 +1,211 @@
+package com.rw.finance.admin.controller;
+
+import com.rw.finance.admin.annotation.AgentInfoAuthor;
+import com.rw.finance.admin.model.MemberCashOrderQueryModel;
+import com.rw.finance.admin.model.MemberInfoQueryModel;
+import com.rw.finance.admin.model.MemberProfitQueryModel;
+import com.rw.finance.admin.service.MemberInfoService;
+import com.rw.finance.admin.service.MemberProfitService;
+import com.rw.finance.common.utils.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 会员相关
+ */
+@RestController
+@RequestMapping(value = "/member")
+public class MemberInfoController {
+    @Autowired
+    private MemberInfoService memberInfoService;
+
+    @Autowired
+    private MemberProfitService memberProfitService;
+
+    /*@Autowired
+    private CashOrderService cashOrderService;*/
+
+    /**
+     * 取得会员列表
+     *
+     * @param queryModel
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "/getmemberinfos")
+    public Result getMemberInfos(MemberInfoQueryModel queryModel) {
+        return new Result(200, null, this.memberInfoService.getMemberInfos(queryModel));
+    }
+
+    /**
+     * 取得会员信息
+     *
+     * @param memberid
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "/getmemberinfo")
+    public Result getMemberInfo(@RequestParam(value = "memberid", required = true) Long memberid) {
+        return new Result(200, null, this.memberInfoService.getMemberInfo(memberid));
+    }
+
+    /**
+     * 取得会员明细
+     *
+     * @param memberid
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "getmemberdetail")
+    public Result getMemberDetail(@RequestParam(value = "memberid", required = true) Long memberid) {
+        return new Result(200, null, this.memberInfoService.getMemberDetail(memberid));
+    }
+
+    /**
+     * 取得会员认证信息
+     *
+     * @param memberid
+     * @return
+     */
+    @AgentInfoAuthor(level = 0)
+    @PostMapping(value = "getmemberauthinfo")
+    public Result getMemberAuthinfo(@RequestParam(value = "memberid", required = true) Long memberid) {
+        return new Result(200, null, this.memberInfoService.getMemberAuthinfo(memberid));
+    }
+
+    /**
+     * 查询收益列表
+     *
+     * @param queryModel
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "getmemberprofits")
+    public Result getMemberProfit(MemberProfitQueryModel queryModel) {
+        return new Result(200, null, this.memberProfitService.getMemberProfits(queryModel));
+    }
+
+    /**
+     * 查询提现列表
+     *
+     * @param queryModel
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "getcashorders")
+    public Result getCashOrders(MemberCashOrderQueryModel queryModel) {
+        return new Result(200, null, null);
+        //return new Result(200, null, this.cashOrderService.getCashOrders(queryModel));
+    }
+
+    /**
+     * 实名认证会员
+     *
+     * @param memberid
+     * @param isreal
+     * @return
+     */
+    @AgentInfoAuthor(level = 0)
+    @PostMapping(value = "/auditreal")
+    public Result auditMemberReal(@RequestParam(value = "memberid", required = true) String memberid, @RequestParam
+            (value = "isreal", required = true) int isreal) {
+        if (memberid == null || memberid.length() <= 0) {
+            return new Result(202, "会员编号为必输项", null);
+        }
+
+        // 处理编号
+        List<Long> listId = new ArrayList();
+        for (String item : memberid.split(",")) {
+            listId.add(Long.parseLong(item));
+        }
+
+        // 提交处理
+        try {
+            this.memberInfoService.auditMemberReal(listId, isreal);
+        } catch (Exception ex) {
+            return new Result(500, "服务器发生异常", null);
+        }
+
+        return new Result(200, "审核成功", null);
+    }
+
+    /**
+     * 修改会员等级
+     *
+     * @param memberid
+     * @param level
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "/updatelevel")
+    public Result updateMemberLevel(@RequestParam(value = "memberid", required = true) String memberid, @RequestParam
+            (value = "level", required = true) Integer level) {
+        if (memberid == null || memberid.length() <= 0) {
+            return new Result(202, "会员编号为必输项", null);
+        }
+
+        // 处理编号
+        List<Long> listId = new ArrayList();
+        for (String item : memberid.split(",")) {
+            listId.add(Long.parseLong(item));
+        }
+
+        // 提交处理
+        try {
+            this.memberInfoService.updateMemberLevel(listId, level);
+        } catch (Exception ex) {
+            return new Result(500, "服务器发生异常", null);
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    /**
+     * 修改会员状态
+     *
+     * @param memberid
+     * @param status
+     * @return
+     */
+    @AgentInfoAuthor(level = 99)
+    @PostMapping(value = "/updatestatus")
+    public Result updateMemberStatus(@RequestParam(value = "memberid", required = true) String memberid, @RequestParam
+            (value = "status", required = true) Integer status) {
+        if (memberid == null || memberid.length() <= 0) {
+            return new Result(202, "会员编号为必输项", null);
+        }
+
+        // 处理编号
+        List<Long> listId = new ArrayList();
+        for (String item : memberid.split(",")) {
+            listId.add(Long.parseLong(item));
+        }
+
+        // 提交处理
+        try {
+            this.memberInfoService.updateMemberStatus(listId, status);
+        } catch (Exception ex) {
+            return new Result(500, "服务器发生异常", null);
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    /**
+     * 取得会员统计
+     *
+     * @param agentid
+     * @param start
+     * @param end
+     * @return
+     */
+    @PostMapping(value = "/getmembercount")
+    @AgentInfoAuthor(level = 99)
+    public Result getMemberCount(@RequestAttribute(value = "agentid", required = true) Long agentid, @RequestParam
+            (value = "start", required = true) String start, @RequestParam(value = "end", required = true) String end) {
+        return new Result(200, null, this.memberInfoService.getMemberCount(agentid, start, end));
+    }
+}

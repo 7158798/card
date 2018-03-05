@@ -1,0 +1,122 @@
+package com.rw.finance.task.task;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.connection.Message;
+import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.rw.finance.common.constants.RepayPlanConstants;
+import com.rw.finance.common.constants.RepayTaskConstants;
+import com.rw.finance.common.entity.RepayPlan;
+import com.rw.finance.common.entity.RepayTask;
+import com.rw.finance.common.utils.DateUtils;
+import com.rw.finance.task.utils.BeanService;
+import com.rw.finance.task.utils.SpringUtil;
+/**
+ * 还款计划任务队列
+ * 
+ * @file RepayPlanTask.java
+ * @author huanghongfei
+ * @date 2017年12月19日 下午6:01:42
+ * @declaration
+ */
+@Component
+public class RepayPlanTask implements MessageListener{
+	
+	private static final String REPAY_TASK_="REPAY_TASK_";
+	
+	@Autowired
+    private ThreadPoolTaskScheduler threadPoolTaskScheduler;
+	
+	private static Map<String,ScheduledFuture<?>> futures=new HashMap<String,ScheduledFuture<?>>();
+	
+	@Bean
+    public ThreadPoolTaskScheduler threadPoolTaskScheduler() {
+		ThreadPoolTaskScheduler threadPool=new ThreadPoolTaskScheduler();
+		threadPool.setPoolSize(1000);
+		return threadPool;
+    }
+	
+	private static final Logger log=LoggerFactory.getLogger(RepayPlanTask.class);
+	/**
+	 * 执行计划
+	 * @param message
+	 */
+	public void execute(long memberid,long planid) {
+		RepayPlan repayPlan=SpringUtil.getBean(BeanService.class).repayPlanService.getByMemberidAndPlanid(memberid, planid);
+		if(StringUtils.isEmpty(repayPlan)){
+			log.error("repay plan is null,memberid:{},planid:{}",memberid,planid);
+			return;
+		}
+		if(repayPlan.getStatus()!=RepayPlanConstants.Status.STATUS0.getStatus()&&repayPlan.getStatus()!=RepayPlanConstants.Status.STATUS1.getStatus()){
+			//如果当前状态不处于待执行或执行中，说明计划异常或已经完成，返回
+			return;
+		}
+		if(repayPlan.getStatus()==RepayPlanConstants.Status.STATUS0.getStatus()){//如果当前计划状态处于待执行中，设置为执行中
+			repayPlan.setStatus(RepayPlanConstants.Status.STATUS1.getStatus());
+			SpringUtil.getBean(BeanService.class).repayPlanService.update(repayPlan);
+		}
+		List<RepayTask> repayTasks=SpringUtil.getBean(BeanService.class).repayTaskService.listByMemberidAndPlanidAndStatus(memberid, planid, RepayTaskConstants.Status.STATUS0.getStatus());
+		for(RepayTask repayTask:repayTasks){
+			if(System.currentTimeMillis()>=DateUtils.getTimeByStr(repayTask.getExecutetime()).getTime()){
+				repayTask.setStatus(RepayTaskConstants.Status.STATUS2.getStatus());
+				SpringUtil.getBean(BeanService.class).repayTaskService.update(repayTask);
+				continue;
+			}
+			ScheduledFuture<?> future = threadPoolTaskScheduler.schedule(new RepayPlanThread(repayTask.getTaskid()), new CronTrigger(DateUtils.getCron(DateUtils.getTimeByStr(repayTask.getExecutetime()))));
+			futures.put(REPAY_TASK_+repayTask.getTaskid(), future);
+		}
+	}
+	/**
+	 * 取消计划
+	 * @param message
+	 */
+	public void cancel(long memberid,long planid) {
+		RepayPlan repayPlan=SpringUtil.getBean(BeanService.class).repayPlanService.getByMemberidAndPlanid(memberid,planid);
+		if(StringUtils.isEmpty(repayPlan)){
+			log.error("the repay plan is null,memberid:{},planid:{}",memberid,planid);
+			return;
+		}
+		if(repayPlan.getStatus().intValue()!=RepayPlanConstants.Status.STATUS1.getStatus()){
+			log.error("the repay plan is executed,memberid:{},planid:{}",memberid,planid);
+			return;
+		}
+		repayPlan.setStatus(RepayPlanConstants.Status.STATUS2.getStatus());
+		SpringUtil.getBean(BeanService.class).repayPlanService.update(repayPlan);
+		//取消任务
+		List<RepayTask> repayTasks=SpringUtil.getBean(BeanService.class).repayTaskService.listByMemberidAndPlanid(memberid, planid);
+		repayTasks.forEach(repayTask->{
+			ScheduledFuture<?> future=futures.get(REPAY_TASK_+repayTask.getTaskid());
+			if(!StringUtils.isEmpty(future)){
+				future.cancel(true);
+			}
+		});
+	}
+	
+	@Override
+	public void onMessage(Message message, byte[] pattern) {
+		log.info("message channel:{},message body:{}",new String(message.getChannel()),new String(message.getBody()));
+		Map<String,Object> params=new Gson().fromJson(message.toString(), new TypeToken<Map<String, Object>>() {}.getType());
+		switch (new String(message.getChannel())) {
+		case RepayPlanConstants.REPAY_PLAN_EXECUTE://执行计划
+			this.execute(Double.valueOf(params.get("memberid").toString()).longValue(),Double.valueOf(params.get("planid").toString()).longValue());
+			break;
+		case RepayPlanConstants.REPAY_PLAN_CANCEL://取消计划
+			this.cancel(Double.valueOf(params.get("memberid").toString()).longValue(),Double.valueOf(params.get("planid").toString()).longValue());
+			break;
+		}
+	}
+}

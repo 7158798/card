@@ -1,0 +1,104 @@
+package com.rw.finance.common.pass.yeepay2.agent;
+
+import java.io.FileInputStream;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.Certificate;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.rw.finance.common.utils.UuidUtil;
+import org.apache.commons.codec.binary.Base64;
+
+import com.rw.finance.common.pay.PayerBo;
+import com.rw.finance.common.utils.MathUtils;
+
+public class PaymentServlet {
+
+	/**
+	 * 转账，代付
+	 * @param userInfo
+	 * @param cardInfo
+	 * @param orderInfo
+	 */
+	public static Map<String,String> doPost(PayerBo.UserInfo userInfo,PayerBo.CardInfo cardInfo,PayerBo.OrderInfo orderInfo){
+		String customerNumber = format(Config.getInstance().getValue("customerNumber"));
+		String groupNumber=format(Config.getInstance().getValue("groupNumber"));
+		String batchNo = format(orderInfo.getTradeNo().substring(14,orderInfo.getTradeNo().length()));
+		String orderId = format(orderInfo.getTradeNo());
+		String amount = format(String.valueOf(MathUtils.persist(orderInfo.getBizAmount(), 2)));
+		//String product = format("RJT");//为空走委托结算出款，值为RJT为日结通出款
+		String urgency=format("1");//当product为日结通出款时该参数不传，0非加急，1加急
+		String accountName = format(userInfo.getPayeeRealName());
+		String accountNumber = format(cardInfo.getPayeeCardNo());
+		String bankCode = format("0");
+		String bankName =format("0");
+		//String bankBranchName = format(request.getParameter("bankBranchName"));
+		//String provinceCode = format(request.getParameter("provinceCode"));
+		//String cityCode =format( request.getParameter("cityCode"));
+		String feeType = format("SOURCE");//手续费方式，SOURCE商户承担，TARGET用户承担
+		//String desc =format( request.getParameter("desc"));
+		//String leaveWord = format(request.getParameter("leaveWord"));		
+		//String abstractInfo =format( request.getParameter("abstractInfo"));
+		Map<String, String> params = new HashMap<>();
+		params.put("customerNumber", customerNumber);
+		params.put("groupNumber", groupNumber);
+		params.put("batchNo", batchNo);
+		params.put("orderId", orderId);
+		params.put("amount", amount);
+		//params.put("product", product);
+		params.put("urgency", urgency);
+		params.put("accountName", accountName);
+		params.put("accountNumber", accountNumber);
+		params.put("bankCode", bankCode);
+		params.put("bankName", bankName);
+		//params.put("bankBranchName", bankBranchName);
+		//params.put("provinceCode", provinceCode);
+		//params.put("cityCode", cityCode);
+		params.put("feeType", feeType);
+		//params.put("desc", desc);
+		//params.put("leaveWord", leaveWord);
+		//params.put("abstractInfo", abstractInfo);
+		String uri = Config.getInstance().getValue("paymentUri");
+		Map<String,String> yopresponsemap	=	YeepayService.yeepayYOP(params,uri);
+		return yopresponsemap;
+	}
+	
+	/*public static void main(String []orgs) throws Exception{
+		PaymentServlet.doPost(new PayerBo().new UserInfo("", "","","曾宪学"), 
+				new PayerBo().new CardInfo("", "", "", "", "", "", "", "", "6217996900028884931"), 
+				new PayerBo().new OrderInfo(UuidUtil.tradeNoBuilder(""),"", 1, "", ""));
+	}*/
+
+	public static String format(String text){
+		return text==null?"":text.trim();
+	}
+	
+	public static void readPfx() throws Exception{
+		// 实例化密钥库，默认JKS类型
+        KeyStore ks = KeyStore.getInstance("PKCS12");
+        // 获得密钥库文件流
+        FileInputStream is = new FileInputStream("C:\\Users\\Administrator\\Desktop\\merchan.pfx");
+        // 加载密钥库
+        ks.load(is,"339924".toCharArray());
+        // 关闭密钥库文件流
+        is.close();
+ 
+        //私钥
+        Enumeration aliases = ks.aliases();
+        String keyAlias = null;
+        if (aliases.hasMoreElements()){
+            keyAlias = (String)aliases.nextElement();
+            System.out.println("p12's alias----->"+keyAlias);
+        }
+        PrivateKey privateKey = (PrivateKey) ks.getKey(keyAlias, "339924".toCharArray());
+        String privateKeyStr = Base64.encodeBase64String(privateKey.getEncoded());
+        System.out.println("私钥------------->" + privateKeyStr);
+ 
+        //公钥
+        Certificate certificate = ks.getCertificate(keyAlias);
+        String publicKeyStr = Base64.encodeBase64String(certificate.getPublicKey().getEncoded());
+        System.out.println("公钥------------->"+publicKeyStr);
+	}
+}

@@ -1,0 +1,81 @@
+package com.rw.finance.admin.service;
+
+import com.rw.finance.admin.model.CountMemberEChartsModel;
+import com.rw.finance.admin.model.MemberAuthInfoModel;
+import com.rw.finance.admin.model.MemberDetailModel;
+import com.rw.finance.admin.model.MemberInfoQueryModel;
+import com.rw.finance.common.entity.MemberInfo;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+
+/**
+ * 会员信息接口
+ */
+public interface MemberInfoService {
+    /**
+     * 取得会员列表
+     *
+     * @param model
+     * @return
+     */
+    Page<MemberInfo> getMemberInfos(MemberInfoQueryModel model);
+
+    /**
+     * 取得会员信息
+     *
+     * @param memberid
+     * @return
+     */
+    MemberInfo getMemberInfo(Long memberid);
+
+    /**
+     * 取得会员明细
+     *
+     * @param memberid
+     * @return
+     */
+    MemberDetailModel getMemberDetail(Long memberid);
+
+    /**
+     * 取得会员认证
+     *
+     * @param memberid
+     * @return
+     */
+    MemberAuthInfoModel getMemberAuthinfo(Long memberid);
+
+    /**
+     * 实名认证会员
+     *
+     * @param listid
+     * @param isreal
+     */
+    void auditMemberReal(List<Long> listid, int isreal);
+
+    /**
+     * 修改会员等级
+     *
+     * @param listid
+     * @param level
+     */
+    void updateMemberLevel(List<Long> listid, Integer level);
+
+    /**
+     * 修改会员状态
+     *
+     * @param listid
+     * @param status
+     */
+    void updateMemberStatus(List<Long> listid, Integer status);
+
+    /**
+     * 取得会员统计
+     *
+     * @param agentid
+     * @param start
+     * @param end
+     * @return
+     */
+    CountMemberEChartsModel getMemberCount(Long agentid, String start, String end);
+}

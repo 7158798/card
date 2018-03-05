@@ -1,0 +1,69 @@
+package com.rw.finance.server.runner;
+
+import com.rw.finance.common.entity.MemberInfo;
+import com.rw.finance.common.utils.DateUtils;
+import com.rw.finance.server.dao.MemberInfoDao;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.stereotype.Component;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+
+/**
+ * @Author huanghongfei
+ * @Description
+ * @Date Create in 20:09 2018/2/6
+ */
+@Component
+public class MemberInfoRunner  implements CommandLineRunner {
+
+    public static final String MEMBER_LEVEL_="MEMBER_LEVEL_";
+
+    @Bean
+    public ThreadPoolTaskScheduler threadPoolTaskScheduler() {
+        return new ThreadPoolTaskScheduler();
+    }
+
+    public static Map<String,ScheduledFuture<?>> futures=new HashMap<String,ScheduledFuture<?>>();
+
+    @Autowired
+    public ThreadPoolTaskScheduler threadPoolTaskScheduler;
+
+    @Autowired
+    private MemberInfoDao memberInfoDao;
+
+    @Override
+    public void run(String... args) throws Exception {
+        List<MemberInfo> memberInfos=memberInfoDao.findByLeveltimeGreaterThan(DateUtils.getTimeStr(new Date()));
+        memberInfos.forEach(memberInfo->{
+            ScheduledFuture<?> future = threadPoolTaskScheduler.schedule(new MemberLevelThread(memberInfo.getMemberid()),new CronTrigger(DateUtils.getCron(DateUtils.getTimeByStr(memberInfo.getLeveltime()))));
+            futures.put(MEMBER_LEVEL_+memberInfo.getMemberid(),future);
+        });
+    }
+
+    /**
+     * 恢复会员等级线程
+     */
+    public class MemberLevelThread implements Runnable {
+        private long memberId;
+        public MemberLevelThread(long memberId){
+            this.memberId=memberId;
+        }
+        @Override
+        public void run() {
+            MemberInfo memberInfo=memberInfoDao.findOne(memberId);
+            if(DateUtils.getTimeByStr(memberInfo.getLeveltime()).getTime()>new Date().getTime()){
+                return;
+            }
+            memberInfo.setLevel(0);
+            memberInfoDao.saveAndFlush(memberInfo);
+        }
+    }
+}

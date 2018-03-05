@@ -1,0 +1,115 @@
+package com.rw.finance.server.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.rw.finance.common.service.BaseCacheService;
+import com.rw.finance.common.service.SystemSettingService;
+
+/**
+ * 
+ * @file SystemSetting.java	
+ * @author huanghongfei
+ * @date 2018年1月12日 下午3:15:23
+ * @declaration
+ */
+@Component
+public class SystemSetting {
+
+	@Autowired
+	private SystemSettingService systemSettingService;
+	@Autowired
+	private BaseCacheService baseCacheService;
+	/**
+	 * 获取会员等级的价格
+	 * @param level
+	 * @return
+	 */
+	public String getLevelPrice(int level){
+		String key="MEMBER_INFO_LEVEL"+level+"_PRICE";
+		Object value=baseCacheService.get(key,String.class);
+		if(!StringUtils.isEmpty(value)){
+			return value.toString();
+		}
+		return systemSettingService.getByDictkey(key).getDictval();
+	}
+	/**
+	 * 支付渠道费率
+	 * @return
+	 */
+	public double PAY_SYSTEM_RATE(){
+		String key="PAY_SYSTEM_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+	/**
+	 * 会员邀请等级会员还款分润利率
+	 * @param level
+	 * @return
+	 */
+	public double MEMBER_PROFIT_REPAY_LEVEL_RATE(int level){
+		String key="MEMBER_PROFIT_REPAY_LEVEL"+level+"_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+	/**
+	 * 会员邀请等级会员提现分润利率
+	 * @param level
+	 * @return
+	 */
+	public double MEMBER_PROFIT_CASH_LEVEL_RATE(int level){
+		String key="MEMBER_PROFIT_CASH_LEVEL"+level+"_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+	/**
+	 * 会员邀请等级会员套现分润利率
+	 * @param level
+	 * @return
+	 */
+	public double MEMBER_PROFIT_BORROW_LEVEL_RATE(int level){
+		String key="MEMBER_PROFIT_BORROW_LEVEL"+level+"_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+	/**
+	 * 会员邀请等级会员激活分润利率
+	 * @param level
+	 * @return
+	 */
+	public double MEMBER_PROFIT_ACTIVE_LEVEL_RATE(int level){
+		String key="MEMBER_PROFIT_ACTIVE_LEVEL"+level+"_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+	
+	/**
+	 * 会员还款所有代理收益总金额比例
+	 * @param level
+	 * @return
+	 */
+	public double MEMBER_REPAY_AGENT_PROFIT_TOTAL_RATE(){
+		String key="MEMBER_REPAY_AGENT_PROFIT_TOTAL_RATE";
+		Object value=baseCacheService.get(key,Double.class);
+		if(!StringUtils.isEmpty(value)){
+			return Double.parseDouble(value.toString());
+		}
+		return Double.parseDouble(systemSettingService.getByDictkey(key).getDictval());
+	}
+}

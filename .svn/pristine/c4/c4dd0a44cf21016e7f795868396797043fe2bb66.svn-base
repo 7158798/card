@@ -1,0 +1,109 @@
+package com.rw.finance.common.entity;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+/**
+ * 支持的渠道编号
+ *
+ * @author huanghongfei
+ * @file BankList.java
+ * @date 2017年12月13日 上午10:17:37
+ * @declaration
+ */
+@Entity
+@Table(name = "bank_info")
+public class BankInfo extends BaseEntity {
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = -9125602192679971882L;
+
+    @Id
+    @GeneratedValue
+    @Column(name = "bank_id")
+    private Long bankid;//
+    @Column(nullable = false, unique = true, name = "bank_code")
+    private String bankcode;//银行编码
+    @Column(nullable = false, unique = true, name = "bank_name")
+    private String bankname;//银行名称
+    @Column(nullable = false, name = "bank_logo")
+    private String banklogo;//银行标志
+    @Column(nullable = false, length = 50, name = "card_color")
+    private String cardcolor;//卡片颜色
+    @Column(nullable=false)
+    private String abbreviation;//银行缩写
+    @Column(name = "card_bins")
+    private String cardbins;//卡bin集
+    @Column(name="bank_extra")
+    private String bankextra;//额外字段集合json
+
+    public Long getBankid() {
+        return bankid;
+    }
+
+    public void setBankid(Long bankid) {
+        this.bankid = bankid;
+    }
+
+    public String getBankcode() {
+        return bankcode;
+    }
+
+    public void setBankcode(String bankcode) {
+        this.bankcode = bankcode;
+    }
+
+    public String getBankname() {
+        return bankname;
+    }
+
+    public void setBankname(String bankname) {
+        this.bankname = bankname;
+    }
+
+    public String getBanklogo() {
+        return banklogo;
+    }
+
+    public void setBanklogo(String banklogo) {
+        this.banklogo = banklogo;
+    }
+
+    public String getCardcolor() {
+        return cardcolor;
+    }
+
+    public void setCardcolor(String cardcolor) {
+        this.cardcolor = cardcolor;
+    }
+
+    
+    public String getAbbreviation() {
+		return abbreviation;
+	}
+
+	public void setAbbreviation(String abbreviation) {
+		this.abbreviation = abbreviation;
+	}
+
+	public String getCardbins() {
+        return cardbins;
+    }
+
+    public void setCardbins(String cardbins) {
+        this.cardbins = cardbins;
+    }
+
+    public String getBankextra() {
+        return bankextra;
+    }
+
+    public void setBankextra(String bankextra) {
+        this.bankextra = bankextra;
+    }
+}

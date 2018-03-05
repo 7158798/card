@@ -1,0 +1,31 @@
+package com.rw.finance.common.pass.yeepay2.agent;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import com.rw.finance.common.pay.PayerBo;
+
+public class PaymentQueryServlet {     
+	
+	public static Map<String,String> doPost(PayerBo.OrderInfo orderInfo){
+		Map<String, String> params = new HashMap<>();
+		params.put("customerNumber", Config.getInstance().getValue("customerNumber"));
+		params.put("batchNo", orderInfo.getTradeNo().substring(14, orderInfo.getTradeNo().length()));
+		params.put("product","RJT");//为空走委托结算出款，值为RJT为日结通出款
+		params.put("orderId", orderInfo.getTradeNo());
+		//params.put("pageNo", pageNo);
+		//params.put("pageSize", pageSize);
+		String uri = Config.getInstance().getValue("paymentqueryUri");
+		Map<String,String> yopresponsemap	=	YeepayService.yeepayYOP(params,uri);
+		return yopresponsemap;
+	}
+	
+	public static String format(String text){
+		return text==null?"":text.trim();
+	}
+	
+	/*public static void main(String []orgs){
+		PaymentQueryServlet.doPost(new PayerBo().new OrderInfo("201802051542161453211456", "", 0, "", ""));
+	}*/
+	
+}

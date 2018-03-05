@@ -1,0 +1,151 @@
+package com.rw.finance.server.service;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.concurrent.ScheduledFuture;
+
+import com.rw.finance.server.runner.MemberInfoRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.alibaba.dubbo.config.annotation.Service;
+import com.google.gson.Gson;
+import com.rw.finance.common.constants.ActvcodeInfoConstants;
+import com.rw.finance.common.constants.MemberInfoConstants;
+import com.rw.finance.common.constants.OrderInfoConstants;
+import com.rw.finance.common.entity.ActvcodeInfo;
+import com.rw.finance.common.entity.MemberCard;
+import com.rw.finance.common.entity.MemberInfo;
+import com.rw.finance.common.entity.OrderInfo;
+import com.rw.finance.common.entity.order.MemberActiveOrder;
+import com.rw.finance.common.pay.PayResult;
+import com.rw.finance.common.pay.PayerBo;
+import com.rw.finance.common.pay.PayerConstants;
+import com.rw.finance.common.pay.PayerFactory;
+import com.rw.finance.common.pay.YeeBao2Payer;
+import com.rw.finance.common.service.ActvcodeInfoService;
+import com.rw.finance.common.service.AgentProfitService;
+import com.rw.finance.common.utils.DateUtils;
+import com.rw.finance.common.utils.UuidUtil;
+import com.rw.finance.server.config.SystemSetting;
+import com.rw.finance.server.dao.ActvcodeInfoDao;
+import com.rw.finance.server.dao.AgentAccountDao;
+import com.rw.finance.server.dao.AgentInfoDao;
+import com.rw.finance.server.dao.MemberInfoDao;
+import com.rw.finance.server.dao.OrderInfoDao;
+import com.rw.finance.server.dao.PayChannelDao;
+/**
+ * 
+ * @file ActvcodeInfoServiceImpl.java	
+ * @author huanghongfei
+ * @date 2017年12月15日 下午2:28:39
+ * @declaration
+ */
+@Component
+@Service(interfaceClass=ActvcodeInfoService.class)
+public class ActvcodeInfoServiceImpl implements ActvcodeInfoService{
+
+	private static final Logger log=LoggerFactory.getLogger(ActvcodeInfoServiceImpl.class);
+	
+	@Autowired
+	private ActvcodeInfoDao actvcodeInfoDao;
+	@Autowired
+	private MemberInfoDao memberInfoDao;
+	@Autowired
+	private AgentProfitService agentProfitService;
+	@Autowired
+	private AgentInfoDao agentInfoDao;
+	@Autowired
+	private AgentAccountDao agentAccountDao;
+	@Autowired
+	private OrderInfoDao orderInfoDao;
+	@Autowired
+	private SystemSetting systemSetting;
+	@Autowired
+	private PayChannelDao payChannelDao;
+
+	@Autowired
+	public ThreadPoolTaskScheduler threadPoolTaskScheduler;
+
+	@Override
+	public ActvcodeInfo getByActivecode(String activecode) {
+		return actvcodeInfoDao.findByActivecode(activecode);
+	}
+
+	@Transactional(rollbackFor = Exception.class)
+	@Override
+	public void testActive(long memberid) {
+		MemberInfo memberInfo=memberInfoDao.findOne(memberid);
+		if(!StringUtils.isEmpty(memberInfo.getLeveltime())||memberInfo.getIsreal().intValue()!=1){
+			return;//已经试用过或已激活或未实名
+		}
+		memberInfo.setLevel(MemberInfoConstants.Level.LEVEL_2);
+		Calendar calendar= Calendar.getInstance();
+		calendar.set(Calendar.DATE,calendar.get(Calendar.DATE)+MemberInfoConstants.TEST_ACTIVE_DATE);
+		calendar.set(Calendar.HOUR,0);
+		memberInfo.setLeveltime(DateUtils.getTimeStr(calendar.getTime()));
+		memberInfoDao.saveAndFlush(memberInfo);
+		ScheduledFuture<?> future = threadPoolTaskScheduler.schedule(new MemberInfoRunner().new MemberLevelThread(memberInfo.getMemberid()),new CronTrigger(DateUtils.getCron(DateUtils.getTimeByStr(memberInfo.getLeveltime()))));
+		MemberInfoRunner.futures.put(MemberInfoRunner.MEMBER_LEVEL_+memberInfo.getMemberid(),future);
+	}
+
+	@Transactional(rollbackFor=Exception.class)
+	@Override
+	public void codeActive(long memberid, String activecode) {
+		ActvcodeInfo actvcodeInfo=actvcodeInfoDao.findByActivecode(activecode);
+		if(StringUtils.isEmpty(actvcodeInfo)){
+			log.error("actvcode info is null,activecode:{}",activecode);
+			return;
+		}
+		MemberInfo memberInfo=memberInfoDao.findOne(memberid);
+		if(StringUtils.isEmpty(memberInfo)){
+			log.error("member info is null,memberid :{}",memberid);
+			return;
+		}
+		actvcodeInfo.setUsestatus(ActvcodeInfoConstants.UseStatus.STATUS2.getStatus());
+		actvcodeInfo.setUsetime(DateUtils.getTimeStr(new Date()));
+		actvcodeInfo.setMemberid(memberid);
+		actvcodeInfoDao.saveAndFlush(actvcodeInfo);
+		memberInfo.setLevel(actvcodeInfo.getLevel());
+		memberInfo.setLeveltime(MemberInfoConstants.LEVEL_TIME_DEFAULT);
+		memberInfo.setActivetime(DateUtils.getTimeStr(new Date()));
+		memberInfoDao.saveAndFlush(memberInfo);
+		//取消定时恢复会员等级的任务
+		MemberInfoRunner.futures.get(MemberInfoRunner.MEMBER_LEVEL_+memberInfo.getMemberid()).cancel(true);
+	}
+	
+	@Transactional(rollbackFor=Exception.class)
+	@Override
+	public PayResult payActive(MemberInfo memberInfo, MemberCard memberCard,int level,String method,String beforeCallbackUrl) {
+		double payAmount=Double.parseDouble(systemSetting.getLevelPrice(level));
+		String tradeNo=UuidUtil.tradeNoBuilder(OrderInfoConstants.Prefix.MemberActiveOrder.getPrefix());
+		PayerBo.OrderInfo oi=new PayerBo().new OrderInfo(tradeNo,"", payAmount,new YeeBao2Payer().getBackUrl(),"");
+		oi.setBeforeBackUrl(beforeCallbackUrl);
+		oi.getProductInfo().setName("会员激活");
+		oi.getProductInfo().setDetails("58还款-会员激活");
+		PayResult payResult=new YeeBao2Payer().pay(new PayerBo().new UserInfo(memberCard.getIdnumber(),memberCard.getRealname()),
+				new PayerBo().new CardInfo(memberCard.getBankname(),memberCard.getProvince(),memberCard.getCity(),memberCard.getAbbreviation(),memberCard.getCardno(), memberCard.getMobile(), memberCard.getAuthcode(), memberCard.getExpirydate()),
+				oi,
+				new PayerBo().new PayInfo(method, "", ""));
+		orderInfoDao.save(new OrderInfo(memberInfo.getMemberid(),memberInfo.getRealname(),tradeNo, payAmount, payAmount,payChannelDao.findByIsdef(1).getChannelid(),payResult.getPayTradeNo(), OrderInfoConstants.Type.MemberActiveOrder.getType(), "",
+			new Gson().toJson(new MemberActiveOrder(level))));
+		return payResult;
+	}
+	
+	@Override
+	public PayResult confirmPayActive(String tradeNo, String code) {
+		OrderInfo orderInfo=orderInfoDao.findByTradeno(tradeNo);
+		if(StringUtils.isEmpty(orderInfo)){
+			log.error("order info is null");
+			return null;
+		}
+		PayResult payResult=new PayerFactory().DefaultPayer().confirm(new PayerBo().new OrderInfo(tradeNo, null, 0,new PayerFactory().DefaultPayer().getBackUrl(), code));
+		return payResult;
+	}
+}

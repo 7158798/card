@@ -1,0 +1,17 @@
+package com.rw.finance.client.controller;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 
+ * @file ActvcodeInfoController.java	
+ * @author huanghongfei
+ * @date 2017年12月28日 上午9:33:21
+ * @declaration
+ */
+@RestController
+@RequestMapping(value="/actvcode/info")
+public class ActvcodeInfoController {
+
+}

@@ -1,0 +1,707 @@
+package com.rw.finance.admin.service.impl;
+
+import com.rw.finance.admin.dao.*;
+import com.rw.finance.admin.model.*;
+import com.rw.finance.admin.service.AgentInfoService;
+import com.rw.finance.admin.service.BaseCacheService;
+import com.rw.finance.common.constants.TimeConstants;
+import com.rw.finance.common.entity.*;
+import com.rw.finance.common.utils.JwtUtil;
+import com.rw.finance.common.utils.Md5Util;
+import com.rw.finance.common.utils.Result;
+import com.rw.finance.common.utils.SortUtils;
+import org.apache.tools.ant.util.DateUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * 实现代理接口
+ *
+ * @author huanghongfei
+ * @file AgentInfoServiceImpl.java
+ * @date 2017年12月9日 下午6:34:47
+ * @declaration
+ */
+@Service
+public class AgentInfoServiceImpl implements AgentInfoService {
+
+    @Autowired
+    private AgentInfoDao agentInfoDao;
+
+    @Autowired
+    private AgentCardDao agentCardDao;
+
+    @Autowired
+    private AgentTypeDao agentTypeDao;
+
+    @Autowired
+    private AgentAccountDao agentAccountDao;
+
+    @Autowired
+    private SystemSettingDao systemSettingDao;
+
+    @Autowired
+    private BaseCacheService baseCacheService;
+
+    @Override
+    public String login(String username, String password) {
+        // 验证登录
+        AgentInfo agentInfo = agentInfoDao.findByUsernameAndPassword(username, Md5Util.md5(password));
+        if (StringUtils.isEmpty(agentInfo) || agentInfo.getStatus() != 1) {
+            return null;
+        }
+
+        // 报文头参数列表
+        Map<String, Object> headerParams = new HashMap<String, Object>();
+
+        // 报文body参数列表
+        Map<String, Object> bodyParams = new HashMap<String, Object>();
+        bodyParams.put("agentid", agentInfo.getAgentid());
+        bodyParams.put("powerlevel", agentInfo.getPowerlevel());
+        return JwtUtil.tokenGenerator(headerParams, bodyParams);
+    }
+
+    @Override
+    public Long getAgentId(String username, String mobile, Boolean isagent) {
+        List<AgentInfo> list = agentInfoDao.findAllByUsername(username);
+        if (list == null || list.size() <= 0) {
+            return 0L;
+        }
+
+        if (isagent) {
+            list = list.stream().filter(s -> s.getAgentlevel() > 0).collect(Collectors.toList());
+        } else {
+            list = list.stream().filter(s -> s.getAgentlevel() == 0).collect(Collectors.toList());
+        }
+
+        if (list == null || list.size() != 1) {
+            return 0L;
+        }
+
+        return list.get(0).getAgentid();
+    }
+
+    @Override
+    public AgentInfoModel getAgentInfo(Long agentid) {
+        // 代理信息
+        AgentInfo model = agentInfoDao.findOne(agentid);
+        if (model == null) {
+            return null;
+        }
+
+        // 返回结果
+        AgentInfoModel info = new AgentInfoModel();
+        BeanUtils.copyProperties(model, info);
+        if (info.getAgentlevel() > 0 && (info == null || info.getAgentid() <= 0)) {
+            return null;
+        }
+
+        // 账户信息
+        AgentAccount account = agentAccountDao.findByAgentid(info.getAgentid());
+        if (account != null) {
+            info.setUserrate(account.getUserrate());
+            info.setSettlerate(account.getSettlerate());
+            info.setSettlecircle(account.getSettlecircle());
+            info.setRepaysharerate(account.getRepaysharerate());
+            info.setActivatesharerate(account.getActivatesharerate());
+            info.setBorrowsharerate(account.getBorrowsharerate());
+            info.setRepaytotal(account.getRepaytotal());
+            info.setRepayincome(account.getRepayincome());
+            info.setCashtotal(account.getCashtotal());
+            info.setCashincome(account.getCashincome());
+            info.setUsablebalance(account.getUsablebalance());
+            info.setLockbalance(account.getLockbalance());
+        }
+
+        return info;
+    }
+
+    @Override
+    public AgentDetailModel getAgentDetail(Long agentid) {
+        // 代理信息
+        AgentInfo agent = agentInfoDao.findOne(agentid);
+        if (agent == null) {
+            return null;
+        }
+
+        AgentDetailModel agentModel = new AgentDetailModel();
+        BeanUtils.copyProperties(agent, agentModel);
+        if (agentModel.getAgentlevel() > 0 && (agentModel == null || agentModel.getAgentid() <= 0)) {
+            return null;
+        }
+
+        // 账户信息
+        AgentAccount account = agentAccountDao.findByAgentid(agentModel.getAgentid());
+        if (account != null) {
+            agentModel.setUserrate(account.getUserrate());
+            agentModel.setSettlerate(account.getSettlerate());
+            agentModel.setSettlecircle(account.getSettlecircle());
+            agentModel.setRepaysharerate(account.getRepaysharerate());
+            agentModel.setActivatesharerate(account.getActivatesharerate());
+            agentModel.setBorrowsharerate(account.getBorrowsharerate());
+            agentModel.setRepaytotal(account.getRepaytotal());
+            agentModel.setRepayincome(account.getRepayincome());
+            agentModel.setCashtotal(account.getCashtotal());
+            agentModel.setCashincome(account.getCashincome());
+            agentModel.setUsablebalance(account.getUsablebalance());
+            agentModel.setLockbalance(account.getLockbalance());
+        }
+
+        // 上级代理
+        if (agent.getParentid() > 0) {
+            AgentInfo parent = agentInfoDao.findOne(agent.getParentid());
+            if (parent != null) {
+                AgentDetailModel parentModel = new AgentDetailModel();
+                BeanUtils.copyProperties(parent, parentModel);
+                agentModel.setParentagent(parentModel);
+            }
+        }
+
+        // 代理类型
+        if (agent.getTypeid() > 0) {
+            AgentType type = agentTypeDao.findOne(agent.getTypeid());
+            if (type != null) {
+                agentModel.setTypename(type.getTypename());
+            }
+        }
+
+        // 卡片集合
+        List<AgentCard> listCard = agentCardDao.findAllByAgentidAndIsdel(agent.getAgentid(), 0);
+        if (listCard != null && listCard.size() > 0) {
+            // 处理卡片
+            for (AgentCard card : listCard) {
+                // 卡号
+                if (card.getCardno() != null && !card.getCardno().isEmpty()) {
+                    card.setCardno(card.getCardno().substring(0, 4) + "****" + card.getCardno().substring(card
+                            .getCardno().length() - 4));
+                }
+
+                // 名字
+                if (card.getCardholder() != null && !card.getCardholder().isEmpty()) {
+                    if (card.getCardholder().length() >= 3) {
+                        card.setCardholder(card.getCardholder().substring(0, 1) + "*" + card.getCardholder()
+                                .substring(card.getCardholder().length() - 1));
+                    } else {
+                        card.setCardholder("*" + card.getCardholder().substring(card.getCardholder().length() - 1));
+                    }
+                }
+
+                // 手机
+                if (card.getMobile() != null && !card.getMobile().isEmpty()) {
+                    card.setMobile(card.getMobile().substring(0, 3) + "****" + card.getMobile().substring
+                            (card.getMobile().length() - 4));
+                }
+            }
+
+            agentModel.setAgentcards(this.copyList(listCard));
+        }
+
+        return agentModel;
+    }
+
+    @Override
+    public Page<AgentInfo> getAgentInfos(AgentInfoQueryModel model) {
+        // 处理排序
+        List<Sort.Order> listOrder = SortUtils.toSortOrder(model.getOrderby());
+        if (model.getPage() > 0) {
+            model.setPage(model.getPage() - 1);
+        }
+
+        // 处理条件
+        Page<AgentInfo> info = agentInfoDao.findAll(new Specification<AgentInfo>() {
+            @Override
+            public Predicate toPredicate(Root<AgentInfo> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder
+                    criteriaBuilder) {
+
+                // 条件集合
+                List<Predicate> predicates = new ArrayList();
+
+                // 代理账号
+                if (model.getUsername() != null && !model.getUsername().isEmpty()) {
+                    predicates.add(criteriaBuilder.like(root.get("username"), "%" + model.getUsername() +
+                            "%"));
+                }
+
+                // 代理名称
+                if (model.getAgentname() != null && !model.getAgentname().isEmpty()) {
+                    predicates.add(criteriaBuilder.like(root.get("agentname"), "%" + model.getAgentname() +
+                            "%"));
+                }
+
+                // 联系人
+                if (model.getLinkman() != null && !model.getLinkman().isEmpty()) {
+                    predicates.add(criteriaBuilder.like(root.get("linkman"), "%" + model.getLinkman() +
+                            "%"));
+                }
+
+                // 联系电话
+                if (model.getMobile() != null && !model.getMobile().isEmpty()) {
+                    predicates.add(criteriaBuilder.like(root.get("mobile"), "%" + model.getMobile() +
+                            "%"));
+                }
+
+                // 上级代理
+                if (model.getParentid() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("parentid"), model.getParentid()));
+                }
+
+                // 代理类型
+                if (model.getTypeid() != null && model.getTypeid() != 0) {
+                    predicates.add(criteriaBuilder.equal(root.get("typeid"), model.getTypeid()));
+                }
+
+                // 管理员
+                if (model.getIsadmin() == true) {
+                    predicates.add(criteriaBuilder.equal(root.get("agentlevel"), 0));
+                } else {
+                    predicates.add(criteriaBuilder.notEqual(root.get("agentlevel"), 0));
+                }
+
+                // 代理等级
+                if (model.getLevelid() != null && model.getLevelid() != 99) {
+                    predicates.add(criteriaBuilder.equal(root.get("agentlevel"), model.getLevelid()));
+                }
+
+                // 权限等级
+                if (model.getPowerlevel() != null && model.getPowerlevel() != 99) {
+                    predicates.add(criteriaBuilder.equal(root.get("powerlevel"), model.getPowerlevel()));
+                }
+
+                // 状态
+                if (model.getStatus() != null && model.getStatus() != 99) {
+                    predicates.add(criteriaBuilder.equal(root.get("status"), model.getStatus()));
+                }
+
+                // 判断条件
+                if (predicates.size() > 0) {
+                    return criteriaQuery.where(predicates.toArray(new Predicate[predicates.size()])).getRestriction();
+                }
+
+                return null;
+            }
+        }, new PageRequest(model.getPage(), model.getSize(), new Sort(listOrder)));
+
+        // 特殊处理
+        if (info.getContent() != null && info.getContent().size() > 0) {
+            // 代理类型
+            List<AgentType> typeList = agentTypeDao.findAll();
+            for (AgentInfo agentInfo : info.getContent()) {
+                if (typeList != null) {
+                    typeList.forEach((s) -> {
+                        if (s.getTypeid() == agentInfo.getTypeid()) {
+                            agentInfo.setTypename(s.getTypename());
+                            return;
+                        }
+                    });
+                }
+            }
+        }
+
+        return info;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public Result saveAgentInfo(long parentid, AgentInfoModel in) {
+        // 反射处理
+        AgentInfo model = new AgentInfo();
+        BeanUtils.copyProperties(in, model);
+        if (model == null) {
+            return new Result(202, "代理信息为空", null);
+        }
+
+        // 父级代理
+        AgentInfo parentInfo = agentInfoDao.findOne(parentid);
+        if (parentInfo.getAgentlevel() >= 3) {
+            return new Result(202, "禁止开通代理", null);
+        }
+
+        if (parentInfo.getAgentlevel() > 0) {
+            AgentAccount parentAccount = agentAccountDao.findByAgentid(parentInfo.getAgentid());
+            if (parentAccount == null) {
+                return new Result(202, "上级代理账户为空", null);
+            }
+
+            if (in.getRepaysharerate() > 0 && in.getRepaysharerate() > parentAccount.getRepaysharerate()) {
+                return new Result(202, "代还分润不能大于上级代还分润比例", null);
+            }
+
+            if (in.getBorrowsharerate() > 0 && in.getBorrowsharerate() > parentAccount.getBorrowsharerate()) {
+                return new Result(202, "收款分润不能大于上级收款分润比例", null);
+            }
+
+            if (in.getActivatesharerate() > 0 && in.getActivatesharerate() > parentAccount.getActivatesharerate()) {
+                return new Result(202, "激活分润不能大于上级激活分润比例", null);
+            }
+
+            model.setParentid(parentInfo.getAgentid());
+        } else {
+            model.setParentid(0L);
+        }
+
+        // 代理类型
+        AgentType agentType = this.agentTypeDao.findOne(in.getTypeid());
+        if (agentType == null) {
+            return new Result(202, "代理类型为空", null);
+        }
+
+        if (parentInfo.getAgentlevel() >= agentType.getAgentlevel()) {
+            return new Result(202, "不能开通此等级代理", null);
+        }
+
+        // 代还分润
+        if (in.getRepaysharerate() > 0 && in.getRepaysharerate() > agentType.getRepaysharerate()) {
+            return new Result(202, "代还分润不能大于默认代还分润比例", null);
+        }
+
+        // 收款分润
+        if (in.getBorrowsharerate() > 0 && in.getBorrowsharerate() > agentType.getBorrowsharerate()) {
+            return new Result(202, "收款分润不能大于默认收款分润比例", null);
+        }
+
+        // 激活分润
+        if (in.getActivatesharerate() > 0 && in.getActivatesharerate() > agentType.getActivatesharerate()) {
+            return new Result(202, "激活分润不能大于默认激活分润比例", null);
+        }
+
+        model.setAgentlevel(agentType.getAgentlevel());
+
+        // 代理账户
+        AgentAccount account = null;
+
+        // 验证操作
+        if (model.getAgentid() <= 0) {
+            // 添加代理
+            AgentInfo info = agentInfoDao.findByUsername(model.getUsername().trim());
+            if (info != null) {
+                return new Result(202, "账号已经存在", null);
+            }
+
+            // 验证名称
+            if (model.getAgentname() != null && !model.getAgentname().isEmpty()) {
+                info = agentInfoDao.findByAgentname(model.getAgentname().trim());
+                if (info != null) {
+                    return new Result(202, "名称已经存在", null);
+                }
+            }
+
+            model.setPassword(Md5Util.md5(model.getPassword()));
+            model.setPaypwd("");
+            model.setCreatetime(DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+
+            // 账户信息
+            if (model.getAgentlevel() > 0) {
+                account = new AgentAccount();
+                account.setUserrate(0D);
+
+                // 结算比例
+                double settleRate = 0d;
+                Object object = baseCacheService.get("PLATFORM_DEFAULT_SETTLE_RATE", Double.class);
+                if (object == null) {
+                    // 写入缓存
+                    SystemSetting systemSetting = systemSettingDao.findByDictkeyAndStatus
+                            ("PLATFORM_DEFAULT_SETTLE_RATE", 1);
+                    if (systemSetting != null) {
+                        settleRate = Double.parseDouble(systemSetting.getDictval());
+                        baseCacheService.set("PLATFORM_DEFAULT_SETTLE_RATE", settleRate, TimeConstants
+                                .SMS_CODE_EXPRIE_TIME);
+                    }
+                } else {
+                    settleRate = (double) object;
+                }
+
+                account.setSettlerate(settleRate);
+                account.setSettlecircle(0);
+                account.setRepaytotal(0D);
+                account.setRepayincome(0D);
+                account.setCashtotal(0D);
+                account.setCashincome(0D);
+                account.setUsablebalance(0D);
+                account.setLockbalance(0D);
+            }
+        } else {
+            // 修改代理
+            AgentInfo info = agentInfoDao.findOne(model.getAgentid());
+            if (info == null) {
+                return new Result(202, "信息不存在", null);
+            }
+
+            if (parentInfo.getAgentlevel() > 0 && info.getParentid() != parentInfo.getAgentid()) {
+                return new Result(202, "禁止修改", null);
+            }
+
+            // 验证账号
+            AgentInfo old;
+            if (model.getAgentname() != null && !model.getAgentname().isEmpty()) {
+                old = agentInfoDao.findByUsername(model.getUsername().trim());
+                if (old != null && old.getAgentid() != model.getAgentid()) {
+                    return new Result(202, "账号已经存在", null);
+                }
+            }
+
+            // 验证名称
+            if (model.getAgentname() != null && !model.getAgentname().isEmpty()) {
+                old = agentInfoDao.findByAgentname(model.getAgentname().trim());
+                if (old != null && old.getAgentid() != model.getAgentid()) {
+                    return new Result(202, "名称已经存在", null);
+                }
+            }
+
+            model.setParentid(info.getParentid());
+            model.setPowerlevel(info.getPowerlevel());
+            model.setPassword(info.getPassword());
+            model.setPaypwd(info.getAgentlevel() == 0 ? "" : info.getPaypwd());
+            model.setCreatetime(info.getCreatetime());
+
+            // 账户信息
+            if (model.getAgentlevel() > 0) {
+                account = agentAccountDao.findByAgentid(model.getAgentid());
+                if (account != null) {
+                    account.setSettlerate(in.getSettlerate());
+                    account.setSettlecircle(in.getSettlecircle());
+                }
+            }
+        }
+
+        model.setUpdatetime(DateUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));
+        model = agentInfoDao.save(model);
+
+        // 保存账户
+        if (account != null) {
+            account.setAgentid(model.getAgentid());
+            account.setRepaysharerate(in.getRepaysharerate());
+            account.setActivatesharerate(in.getActivatesharerate());
+            account.setBorrowsharerate(in.getBorrowsharerate());
+
+            agentAccountDao.save(account);
+        }
+
+        return new Result(200, "保存成功", null);
+    }
+
+    @Override
+    public Result updateLoginPwd(Long agentid, String newpwd) {
+        AgentInfo model = agentInfoDao.findOne(agentid);
+        if (model == null) {
+            return new Result(202, "信息不存在", null);
+        }
+
+        if (model.getPassword() != Md5Util.md5(newpwd)) {
+            model.setPassword(Md5Util.md5(newpwd));
+            agentInfoDao.save(model);
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    @Override
+    public Result updatePayPwd(Long agentid, String newpwd) {
+        AgentInfo model = agentInfoDao.findOne(agentid);
+        if (model == null) {
+            return new Result(202, "信息不存在", null);
+        }
+
+        if (model.getPaypwd() != Md5Util.md5(newpwd)) {
+            model.setPaypwd(Md5Util.md5(newpwd));
+            agentInfoDao.save(model);
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    @Override
+    @Transactional
+    public Result updateStatus(List<Long> agentid, Integer status) {
+        Iterable<AgentInfo> list = agentInfoDao.findAll(agentid);
+        if (list == null) {
+            return new Result(202, "信息不存在", null);
+        }
+
+        for (AgentInfo item : list) {
+            if (item.getStatus() != status) {
+                item.setStatus(status);
+                agentInfoDao.save(item);
+            }
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    @Override
+    public Result updateUserRate(Long agentid, Double rate) {
+        AgentInfo model = agentInfoDao.findOne(agentid);
+        if (model == null) {
+            return new Result(202, "代理信息不存在", null);
+        }
+
+        AgentAccount account = agentAccountDao.findByAgentid(agentid);
+        if (account == null) {
+            return new Result(202, "账户信息不存在", null);
+        }
+
+        // 结算费率
+        double settleRate = account.getSettlerate();
+        if (rate < settleRate) {
+            return new Result(202, "用户费率不能小于结算费率", null);
+        }
+
+        if (account.getUserrate() != rate) {
+            account.setUserrate(rate);
+            agentInfoDao.save(model);
+        }
+
+        return new Result(200, "修改成功", null);
+    }
+
+    @Override
+    public Result deleteAgentInfo(Long agentid) {
+        AgentInfo model = agentInfoDao.findOne(agentid);
+        if (model == null) {
+            return new Result(202, "信息不存在", null);
+        }
+
+        if (model.getAgentid() == 1) {
+            return new Result(202, "超级管理员，禁止删除", null);
+        }
+
+        List<AgentInfo> list = agentInfoDao.findAllByParentid(agentid);
+        if (list != null && list.size() > 0) {
+            return new Result(202, "存在下级代理，禁止删除", null);
+        }
+
+        model.setStatus(0);
+        agentInfoDao.save(model);
+        return new Result(200, "删除成功", null);
+    }
+
+    @Override
+    public CountAgentEChartsModel getAgentCount(Long agentid, String start, String end) {
+        // 代理信息
+        AgentInfo agentInfo = this.agentInfoDao.findOne(agentid);
+        if (agentInfo == null) {
+            return null;
+        }
+
+        // 统计结果
+        CountAgentEChartsModel model = new CountAgentEChartsModel();
+
+        // 日期集合
+
+        List<String> date = com.rw.finance.common.utils.DateUtils.getDateList(start, end);
+        model.setDate(date);
+
+        // 周期开始与结束
+        start = date.get(0) + " 00:00:00";
+        end = date.get(date.size() - 1) + " 23:59:59";
+
+        //region 代理统计
+        List<Long> count = new ArrayList();
+        List<Long> level1 = new ArrayList();
+        List<Long> level2 = new ArrayList();
+        List<Long> level3 = new ArrayList();
+
+        // 查出代理
+        List<AgentInfo> agentInfoList = null;
+        if (agentInfo.getAgentlevel() > 0) {
+            agentInfoList = agentInfoDao.findAllByParentidAndAgentlevelGreaterThanAndCreatetimeBetween(agentInfo
+                    .getAgentid(), 0, start, end);
+        } else {
+            agentInfoList = agentInfoDao.findByAgentlevelGreaterThanAndCreatetimeBetween(0, start, end);
+        }
+
+        // 循环统计
+        for (String item : date) {
+            if (agentInfoList == null || agentInfoList.size() <= 0) {
+                count.add(0L);
+                level1.add(0L);
+                level2.add(0L);
+                level3.add(0L);
+            } else {
+                Long date_1 = com.rw.finance.common.utils.DateUtils.getTimeByStr(item + " 00:00:00").getTime();
+                Long date_2 = com.rw.finance.common.utils.DateUtils.getTimeByStr(item + " 23:59:59").getTime();
+
+                // 代理总量
+                Stream<AgentInfo> streamAdd = agentInfoList.stream().filter(s -> com.rw.finance.common.utils.DateUtils
+                        .getTimeByStr(s.getCreatetime()).getTime() >= date_1 && com.rw.finance.common.utils.DateUtils
+                        .getTimeByStr(s.getCreatetime()).getTime() <= date_2);
+                count.add(streamAdd.count());
+
+                // 分开统计
+                if (agentInfo.getAgentlevel() <= 0) {
+                    level1.add(agentInfoList.stream().filter(s -> com.rw.finance.common.utils.DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() >= date_1 && com.rw.finance.common.utils
+                            .DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() <= date_2 && s.getAgentlevel() == 1).count());
+                    level2.add(agentInfoList.stream().filter(s -> com.rw.finance.common.utils.DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() >= date_1 && com.rw.finance.common.utils
+                            .DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() <= date_2 && s.getAgentlevel() == 2).count());
+                    level3.add(agentInfoList.stream().filter(s -> com.rw.finance.common.utils.DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() >= date_1 && com.rw.finance.common.utils
+                            .DateUtils
+                            .getTimeByStr(s.getCreatetime()).getTime() <= date_2 && s.getAgentlevel() == 3).count());
+                }
+            }
+        }
+
+        model.setAddcount(count);
+        model.setLevel1count(level1);
+        model.setLevel2count(level2);
+        model.setLevel3count(level3);
+
+        //endregion
+
+        return model;
+    }
+
+    /**
+     * 复制代理对象集合
+     *
+     * @param list
+     * @return
+     */
+    private List<AgentCardModel> copyList(List<AgentCard> list) {
+        // 排序
+        Collections.sort(list, new Comparator<AgentCard>() {
+            public int compare(AgentCard o1, AgentCard o2) {
+
+                // 按照顺序排序
+                if (o1.getAgentcardid() > o2.getAgentcardid()) {
+                    return 1;
+                }
+                if (o1.getAgentcardid() == o2.getAgentcardid()) {
+                    return 0;
+                }
+
+                return -1;
+            }
+        });
+
+        // 返回结果
+        List<AgentCardModel> result = new ArrayList<>();
+
+        // 循环复制
+        for (AgentCard item : list) {
+            AgentCardModel model = new AgentCardModel();
+            BeanUtils.copyProperties(item, model);
+            result.add(model);
+        }
+
+        return result;
+    }
+}

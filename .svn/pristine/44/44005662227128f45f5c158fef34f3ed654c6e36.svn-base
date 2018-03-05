@@ -1,0 +1,138 @@
+package com.rw.finance.server.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+
+import com.alibaba.dubbo.config.annotation.Service;
+import com.google.gson.Gson;
+import com.rw.finance.common.constants.MemberCardConstatns;
+import com.rw.finance.common.constants.OrderInfoConstants;
+import com.rw.finance.common.entity.MemberAccount;
+import com.rw.finance.common.entity.MemberCard;
+import com.rw.finance.common.entity.MemberInfo;
+import com.rw.finance.common.entity.MemberLevel;
+import com.rw.finance.common.entity.PayChannel;
+import com.rw.finance.common.entity.order.MemberBorrowOrder;
+import com.rw.finance.common.entity.order.MemberCashOrder;
+import com.rw.finance.common.pay.PayResult;
+import com.rw.finance.common.pay.PayerBo;
+import com.rw.finance.common.pay.PayerFactory;
+import com.rw.finance.common.pay.YeeBao2Payer;
+import com.rw.finance.common.service.MemberAccountService;
+import com.rw.finance.common.utils.MathUtils;
+import com.rw.finance.common.utils.UuidUtil;
+import com.rw.finance.server.config.SystemSetting;
+import com.rw.finance.server.dao.MemberAccountDao;
+import com.rw.finance.server.dao.MemberCardDao;
+import com.rw.finance.server.dao.MemberInfoDao;
+import com.rw.finance.server.dao.MemberLevelDao;
+import com.rw.finance.server.dao.OrderInfoDao;
+import com.rw.finance.server.dao.PayChannelDao;
+
+/**
+ * 
+ * @file MemberAccountServiceImpl.java	
+ * @author huanghongfei
+ * @date 2017年12月23日 下午3:55:37
+ * @declaration
+ */
+@Component
+@Service(interfaceClass=MemberAccountService.class)
+public class MemberAccountServiceImpl implements MemberAccountService{
+
+	private static final Logger log=LoggerFactory.getLogger(MemberAccountServiceImpl.class);
+	
+	@Autowired
+	private MemberAccountDao memberAccountDao;
+	@Autowired
+	private MemberCardDao memberCardDao;
+	@Autowired
+	private MemberInfoDao memberInfoDao;
+	@Autowired
+	private MemberLevelDao memberLevelDao;
+	@Autowired
+	private OrderInfoDao orderInfoDao;
+	@Autowired
+	private SystemSetting systemSetting;
+	@Autowired
+	private PayChannelDao payChannelDao;
+	
+	@Override
+	public MemberAccount getByMemberid(long memberid) {
+		return memberAccountDao.findByMemberid(memberid);
+	}
+
+	@Override
+	public void update(MemberAccount memberAccount) {
+		memberAccountDao.saveAndFlush(memberAccount);
+	}
+	
+	@Transactional(rollbackFor=Exception.class)
+	@Override
+	public PayResult outcash(long memberid, double amount,long cardid) {
+		MemberInfo memberInfo=memberInfoDao.findOne(memberid);
+		MemberLevel memberLevel=memberLevelDao.findByLevelAndChannelid(memberInfo.getLevel().intValue(), payChannelDao.findByIsdef(1).getChannelid());
+		MemberAccount memberAccount=memberAccountDao.findByMemberid(memberid);
+		//提现需要有的余额，提现金额+（提现金额*提现费率）+额外提现手续费
+		double needUseableBalance=MathUtils.add(amount,MathUtils.add(MathUtils.multiply(amount, memberLevel.getCashrate()),memberLevel.getCashpoundage()));
+		if(memberAccount.getUsablebalance()<needUseableBalance){
+			return new PayResult("999", false, "", "", "not enough balance", 0);
+		}
+		MemberCard memberCard=memberCardDao.findByMemberidAndCardidAndType(memberid, cardid,MemberCardConstatns.Type.TYPE1.getType());
+		String tradeNo=UuidUtil.tradeNoBuilder(OrderInfoConstants.Prefix.MemberCashOrder.getPrefix());
+		PayResult payResult=new YeeBao2Payer().agentPay(new PayerBo().new UserInfo(memberInfo.getIdnumber(), memberInfo.getRealname()),
+				new PayerBo().new CardInfo(memberCard.getBankname(),memberCard.getProvince(),memberCard.getCity(),memberCard.getAbbreviation(),memberCard.getCardno(), memberCard.getBankcode(), memberCard.getMobile(), memberCard.getAuthcode()),
+				new PayerBo().new OrderInfo(tradeNo, "", amount,new PayerFactory().DefaultPayer().getBackUrl(),""));
+		if(payResult.getSuccess()){//接受通知成功，将金额锁定,等待支付成功扣将锁定余额减去
+			memberAccount.setUsablebalance(MathUtils.subtract(memberAccount.getUsablebalance(), MathUtils.add(amount,MathUtils.multiply(amount, systemSetting.PAY_SYSTEM_RATE()))));
+			memberAccount.setLockbalance(MathUtils.add(memberAccount.getLockbalance(), MathUtils.add(amount,MathUtils.multiply(amount, systemSetting.PAY_SYSTEM_RATE()))));
+			memberAccountDao.saveAndFlush(memberAccount);
+			double poundage=MathUtils.multiply(amount,memberLevel.getCashrate());//通道费
+			poundage=MathUtils.add(poundage, memberLevel.getCashpoundage());//手续费
+			double realAmount=MathUtils.add(amount,poundage);
+			orderInfoDao.save(new com.rw.finance.common.entity.OrderInfo(memberid,memberInfo.getRealname(), tradeNo, amount, realAmount,payChannelDao.findByIsdef(1).getChannelid(),payResult.getPayTradeNo(),OrderInfoConstants.Type.MemberCashOrder.getType(),"",new Gson().toJson(new MemberCashOrder(cardid,poundage))));
+		}
+		return payResult;
+	}
+	
+	@Transactional(rollbackFor=Exception.class)
+	@Override
+	public PayResult borrowcash(long memberid, double amount, long fromcardid,long tocardid,long channelid) {
+		MemberInfo memberInfo=memberInfoDao.findOne(memberid);
+		Assert.notNull(memberInfo,"memberInfo can't be null!");
+		PayChannel payChannel=payChannelDao.findOne(channelid);
+		Assert.notNull(payChannel,"payChannel can't be null!");
+		if(amount<payChannel.getMinamount()||amount>payChannel.getMaxamout()){//通道限额
+			return new PayResult("999", false, "", "", "", 0);
+		}
+		MemberCard fromCard=memberCardDao.findByMemberidAndCardidAndType(memberid, fromcardid, MemberCardConstatns.Type.TYPE2.getType());
+		Assert.notNull(fromCard,"fromCard can't be null!");
+		MemberCard toCard=memberCardDao.findByMemberidAndCardidAndType(memberid, tocardid, MemberCardConstatns.Type.TYPE1.getType());
+		Assert.notNull(toCard,"toCard can't be null!");
+		MemberLevel memberLevel=memberLevelDao.findByLevelAndChannelid(memberInfo.getLevel(),payChannel.getChannelid());
+		double poundage=MathUtils.multiply(amount, memberLevel.getBorrowrate());//通道费
+		poundage=MathUtils.add(poundage,memberLevel.getBorrowpoundage());//手续费
+		double realAmount=MathUtils.add(amount,poundage);//实际金额
+		String tradeNo=UuidUtil.tradeNoBuilder(OrderInfoConstants.Prefix.MemberBorrowOrder.getPrefix());
+		PayResult payResult=null;
+		if(channelid==1){//创新支付,分扣款和还款
+			payResult=new PayerFactory().ChuangXinPayer().pay(new PayerBo().new UserInfo(memberInfo.getIdnumber(), memberInfo.getRealname()),
+					new PayerBo().new CardInfo(fromCard.getBankname(),fromCard.getProvince(),fromCard.getCity(),fromCard.getAbbreviation(),fromCard.getCardno(), fromCard.getMobile(),fromCard.getAuthcode(),fromCard.getExpirydate()),
+					new PayerBo().new OrderInfo(tradeNo,"", realAmount,new PayerFactory().DefaultPayer().getBackUrl(),""));
+		}
+		if(channelid==2){//绝顶支付，一步完成，已传入收款人卡号
+			payResult=new PayerFactory().JdsoftPayer().pay(new PayerBo().new UserInfo(memberInfo.getIdnumber(), memberInfo.getRealname()),
+					new PayerBo().new CardInfo(fromCard.getBankname(),fromCard.getProvince(),fromCard.getCity(),fromCard.getAbbreviation(),fromCard.getCardno(), fromCard.getMobile(),fromCard.getAuthcode(),fromCard.getExpirydate(),toCard.getCardno()),
+					new PayerBo().new OrderInfo(tradeNo,"", realAmount,new PayerFactory().DefaultPayer().getBackUrl(),""));
+		}
+		orderInfoDao.save(new com.rw.finance.common.entity.OrderInfo(memberid,memberInfo.getRealname(),tradeNo, amount, realAmount,payChannel.getChannelid(),payResult.getPayTradeNo(), 
+				OrderInfoConstants.Type.MemberBorrowOrder.getType(), "", 
+				new Gson().toJson(new MemberBorrowOrder(fromcardid,tocardid,poundage))));
+		return payResult;
+	}
+
+}

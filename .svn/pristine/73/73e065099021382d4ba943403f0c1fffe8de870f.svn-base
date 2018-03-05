@@ -1,0 +1,31 @@
+package com.rw.finance.server.service;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.rw.finance.common.pay.PayerBo;
+import com.rw.finance.common.pay.PayerFactory;
+import com.rw.finance.common.service.OrderInfoService;
+import com.rw.finance.server.BaseTest;
+/**
+ * 
+ * @file OrderInfoServiceTest.java	
+ * @author huanghongfei
+ * @date 2018年1月10日 上午11:02:28
+ * @declaration
+ */
+public class OrderInfoServiceTest extends BaseTest{
+
+	@Autowired
+	private OrderInfoService orderInfoService;
+	
+	//@Test
+	public void getByDetailsLike(){
+		System.err.println(orderInfoService.getByDetailsLike("\"taskId\":"+631));
+	}
+	
+	@Test
+	public void queryOrder(){
+		new PayerFactory().DefaultPayer().queryOrder(new PayerBo().new OrderInfo("0201801514303451218900722695201","", 0,new PayerFactory().DefaultPayer().getBackUrl(), ""));
+	}
+}

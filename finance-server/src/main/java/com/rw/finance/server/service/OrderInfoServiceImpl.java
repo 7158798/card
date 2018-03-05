@@ -1,0 +1,44 @@
+package com.rw.finance.server.service;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Component;
+
+import com.alibaba.dubbo.config.annotation.Service;
+import com.rw.finance.common.entity.OrderInfo;
+import com.rw.finance.common.service.OrderInfoService;
+import com.rw.finance.server.dao.OrderInfoDao;
+/**
+ * 
+ * @file OrderInfoServiceImpl.java	
+ * @author huanghongfei
+ * @date 2017年12月15日 上午9:52:21
+ * @declaration
+ */
+@Component
+@Service(interfaceClass=OrderInfoService.class)
+public class OrderInfoServiceImpl implements OrderInfoService{
+
+	@Autowired
+	private OrderInfoDao orderInfoDao;
+	
+	@Override
+	public void add(OrderInfo orderInfo) {
+		orderInfoDao.save(orderInfo);
+	}
+
+	@Override
+	public List<OrderInfo> listByMemberidAndType(long memberid,int type,int page,int size) {
+		Sort sort = new Sort(Sort.Direction.DESC, "createtime");
+		return orderInfoDao.findByUseridAndType(memberid,type,new PageRequest(page, size,sort)).getContent();
+	}
+
+	@Override
+	public OrderInfo getByDetailsLike(String details) {
+		return orderInfoDao.findByDetailsLike(details);
+	}
+
+}

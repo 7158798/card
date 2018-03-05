@@ -1,0 +1,86 @@
+package com.rw.finance.admin.dao;
+
+import com.rw.finance.common.entity.ActvcodeInfo;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.repository.PagingAndSortingRepository;
+
+import java.util.List;
+
+/**
+ * 激活码数据
+ */
+public interface ActvcodeInfoDao extends PagingAndSortingRepository<ActvcodeInfo, Long>,
+        JpaSpecificationExecutor<ActvcodeInfo> {
+    /**
+     * 查询代理激活码
+     *
+     * @param agentid
+     * @return
+     */
+    List<ActvcodeInfo> findAllByAgentid(Long agentid);
+
+    /**
+     * 查询激活码列表
+     *
+     * @param agentid
+     * @param status
+     * @param start
+     * @param end
+     * @return
+     */
+    List<ActvcodeInfo> findByAgentidAndUsestatusAndUsetimeBetween(Long agentid, Integer status, String start, String
+            end);
+
+
+    /**
+     * 查询激活码列表
+     *
+     * @param status
+     * @param start
+     * @param end
+     * @return
+     */
+    List<ActvcodeInfo> findByUsestatusAndUsetimeBetween(Integer status, String start, String end);
+
+    /**
+     * 查询激活码列表
+     *
+     * @param agentid
+     * @param status
+     * @param start
+     * @param end
+     * @return
+     */
+    List<ActvcodeInfo> findByAgentidAndSalestatusAndCreatetimeBetween(Long agentid, Integer status, String start, String
+            end);
+
+
+    /**
+     * 查询激活码列表
+     *
+     * @param status
+     * @param start
+     * @param end
+     * @return
+     */
+    List<ActvcodeInfo> findBySalestatusAndCreatetimeBetween(Integer status, String start, String end);
+
+    /**
+     * 查询激活码个数
+     *
+     * @param salestatus
+     * @param usestatus
+     * @return
+     */
+    Long countBySalestatusAndUsestatus(Integer salestatus, Integer usestatus);
+
+    /**
+     * 查询激活码个数
+     *
+     * @param salestatus
+     * @param usestatus
+     * @param agentid
+     * @return
+     */
+    Long countBySalestatusAndUsestatusAndAgentid(Integer salestatus, Integer usestatus, Long agentid);
+}

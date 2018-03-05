@@ -1,0 +1,21 @@
+{
+  "app_key": "OPR:10018503410",
+  "server_root": "https://open.yeepay.com/yop-center",
+  "yos_server_root": "https://yos.yeepay.com/yop-center",
+  "yop_public_key": [
+    {
+      "store_type": "string",
+      "cert_type": "RSA2048",
+      "value":"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6p0XWjscY+gsyqKRhw9MeLsEmhFdBRhT2emOck/F1Omw38ZWhJxh9kDfs5HzFJMrVozgU+SJFDONxs8UB0wMILKRmqfLcfClG9MyCNuJkkfm0HFQv1hRGdOvZPXj3Bckuwa7FrEXBRYUhK7vJ40afumspthmse6bs6mZxNn/mALZ2X07uznOrrc2rk41Y2HftduxZw6T4EmtWuN2x4CZ8gwSyPAW5ZzZJLQ6tZDojBK4GZTAGhnn3bg5bBsBlw2+FLkCQBuDsJVsFPiGh/b6K/+zGTvWyUcu+LUj2MejYQELDO3i2vQXVDk7lVi2/TcUYefvIcssnzsfCfjaorxsuwIDAQAB MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6p0XWjscY+gsyqKRhw9MeLsEmhFdBRhT2emOck/F1Omw38ZWhJxh9kDfs5HzFJMrVozgU+SJFDONxs8UB0wMILKRmqfLcfClG9MyCNuJkkfm0HFQv1hRGdOvZPXj3Bckuwa7FrEXBRYUhK7vJ40afumspthmse6bs6mZxNn/mALZ2X07uznOrrc2rk41Y2HftduxZw6T4EmtWuN2x4CZ8gwSyPAW5ZzZJLQ6tZDojBK4GZTAGhnn3bg5bBsBlw2+FLkCQBuDsJVsFPiGh/b6K/+zGTvWyUcu+LUj2MejYQELDO3i2vQXVDk7lVi2/TcUYefvIcssnzsfCfjaorxsuwIDAQAB"
+      }
+  ],
+  "isv_private_key": [
+    {
+      "store_type": "string",
+      "cert_type": "RSA2048",
+      "value": "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDI/PUi1dOi4owWcbZqs1xrJMiTUURvnDQJQGLBI7iRCJL6g1t32mkThWOqVWbysjtCJyXU0ylvgHNgMrCj0T6gEo/w3RxXjvR0GBReUa/QpA3H60kkX5Xesakci1Fc5ufF22BO2iDjTyX7DsUI5EoR9ayzYMhmq8UHpsCgqCBW7lLhQ5jed5gGjx3nbWkIBr0YM/9x4w6+1vF4lTVI+3di7o/0lP1qfkEyDXxAHr/dS2z+dEDJzrF+BLu7M40aTuWU2IUSwfo3c9Sq+pKoi/7jCI6B+lRSGnD0ekg03PxYlCS4Se23/2KA+f4n/W94H2QKxyTbnW8vlXDVPYoJkDNlAgMBAAECggEBALDI9yG97Npv5IJ1YNt3iknf3+DccZKuVYLxtCtoLRa88PMSiWjhnt0Bzglr9xJwPPlSD8+kMOUXmeQ6ke51xVztFtjo094cKt7Ws0vHFBszwb9gMESjIuLvZ+1oiZdqruD0tkCFUro9yw2KDztj+dbUPiTFc2ADpFm3jeWCHHf4t0pmzuPCC90KWBNlLCyn7PnReiONK+rGl2kMKegDyq75AcEf/MYZTwPlGQGIp4ItoPuabBzeI4yIkSvA+MPp52Pn2s/fT2vfVmdcfzQ/NroChEbLXTiloJK5YrrRwo0oG/ThIqKoPgqtlwlifYcJcY11DOhXoExFtmdvr2CweN0CgYEA7akjtK3+cg70asiiE512HDqWwh8E4WJfdNInu412THFgwyAO6V4zpwWPqtNjBAYqY+9jT57yPfN8uIYBlQg4O6WOhn02mBSLGMWjUNP/WrAofb7SOzGFfAjiXkf4zvS370tIk235z9DGv6mrmW5iSy0xhKiOvF70pq9gCtSZ278CgYEA2H9e5gwvsj5v2kcL0YrS4WcvSkKYQsabtOj0kNRHq6O+tbSW/7ZgPhtm8EhC2IVaMcgUcDjxPfwD9P7Ioru/ofbJ7CV9PxU7Y17tIhLxdwh0ODXLCZaXsiGC7+E6JgOU1BIf8JlsKS4RYyvrYztoGmcPoY1cvcjcW52mt+KoidsCgYEAodzPh6/1GwOabdvlnwxgM8unf+CWd1aDgtHa477t8hRJ/bsozMIu1bNQ7Nx5lHUKi/OvpLuxaoYZzKbgDvuBKQaRsoE3HI7pSV7Z4yPvx3kwqqu7DTumGRsH6YSFLZa4a07PyDFfsa0Un9bUG3R1l5PZJOuUAzF82MWa2OWBQIsCgYBXqqwY55Jg0Rul/eLxRQ/Dqm7h2TmiwJ3IkhSGmQ80l6fgGHKUtZsfSyVR41D+MHGneueb0dMOUIChspI4I2KkCTUW5M9kvgpAYO4RQC57DvdQ06eWCF8BCMTmsgND5WtcvMImQVolCryLtfspQaMUHeucdYu6Zh2lE5+xEp1AxQKBgHkBSXjOrd4ct8pGN1tNh2e75tO6cXxOra6i7oUAhlU1+UkZbWhX4rEZHUEmprkatpVujpXoKCC0c0sSqKcP7cgnApxE1yfLw/C4I+ONTkzqAl4Bjla0kOsoUmeVXnYR1QNk0O9v/Wvu2e9c2u1vWzR+FZEWYqBDIBdAAZ1OOKPx"
+    }
+  ],
+  "default_protocol_version": "yop-auth-v2",
+  "sdk_version": "2.0.0"
+}	
